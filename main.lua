@@ -12,6 +12,8 @@ physics.setGravity(0, 0)
 -- Seed the random number generator
 math.randomseed(os.time())
 
+display.setStatusBar(display.HiddenStatusBar)
+
 local sheetOptions = {
     frames = {
         { -- 1) Asteroid 1
@@ -76,3 +78,90 @@ ship.myName = "ship"
 
 livesText = display.newText(uiGroup, "Lives: " .. lives, 200, 80, native.systemFont, 36)
 scoreText = display.newText(uiGroup, "Score: " .. score, 400, 80, native.systemFont, 36)
+
+local function updateLivesAndScore()
+    livesText.text = "Lives: " .. lives
+    scoreText.text = "Score: " .. score
+end
+
+local function createAsteroid()
+    local newAsteroid = display.newImageRect(mainGroup, objectSheet, 1, 102, 85)
+    table.insert(asteroidsTable, newAsteroid)
+    physics.addBody(newAsteroid, "dynamic", { radius = 40, bounce = 0.8, isSensor = true })
+    newAsteroid.myName = "asteroid"
+
+    local asteroidStartingPos = math.random(3)
+
+    if (whereFrom == 1) then
+        newAsteroid.x = -60
+        newAsteroid.y = math.random(500)
+        newAsteroid:setLinearVelocity(math.random(40,120), math.random(20, 60))
+    elseif (whereFrom == 2) then
+        newAsteroid.x = math.random(display.contentWidth)
+        newAsteroid.y = -60
+        newAsteroid:setLinearVelocity(math.random(-40,40), math.random(40, 120))
+    else
+        newAsteroid.x = display.contentWidth + 60
+        newAsteroid.y = math.random(500)
+        newAsteroid:setLinearVelocity(math.random(-120,-40), math.random(20, 60))
+    end
+    newAsteroid:applyTorque(math.random(-6, 6))
+end
+
+local function fireLaser()
+    local newLaser = display.newImageRect(mainGroup, objectSheet, 5, 14, 40)
+    physics.addBody(newLaser, "dynamic", {isSensor = true})
+    newLaser.isBullet = true
+    newLaser.myName = "laser"
+
+    newLaser.x = ship.x
+    newLaser.y = ship.y
+    newLaser:toBack()
+    transition.to(newLaser, { y = -40, time = 500, 
+        onComplete = function() display.remove(newLaser) end 
+    })
+end
+
+ship:addEventListener("tap", fireLaser)
+
+
+local function dragShip(event)
+    local ship = event.target
+    local phase = event.phase
+
+    if (phase == "began") then
+        display.currentStage:setFocus(ship)
+        ship.touchOffsetX = event.x - ship.x
+        ship.touchOffsetY = event.y - ship.y
+    elseif (phase == "moved") then
+        ship.x = event.x - ship.touchOffsetX
+        if (event.y > 700) then
+            ship.y = event.y - ship.touchOffsetY
+        end
+    elseif (phase == "ended" or phase == "cancelled") then 
+        display.currentStage:setFocus(nil)
+    end
+    return true
+end
+
+ship:addEventListener("touch", dragShip)
+
+
+local function gameLoop()
+    createAsteroid()
+
+    for i = #asteroidsTable, 1, -1 do
+        local thisAsteroid = asteroidsTable[i]
+
+        if ( thisAsteroid.x < -100 or
+             thisAsteroid.x > display.contentWidth + 100 or
+             thisAsteroid.y < -100 or
+             thisAsteroid.y > display.contentHeight + 100 )
+        then
+            display.remove(thisAsteroid)
+            table.remove(asteroidsTable, i)
+        end
+    end
+end
+
+gameLoopTimer = timer.performWithDelay(500, gameLoop, 0)
